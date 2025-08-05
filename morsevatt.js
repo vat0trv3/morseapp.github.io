@@ -4,130 +4,121 @@ const MORSE_CODE_DICT = {
     'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..',
     'M': '--', 'N': '-.', 'O': '---', 'P': '.--.', 'Q': '--.-', 'R': '.-.',
     'S': '...', 'T': '-', 'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-',
-    'Y': '-.--', 'Z': '--..',
-    '1': '.----', '2': '..---', '3': '...--', '4': '....-', '5': '.....',
-    '6': '-....', '7': '--...', '8': '---..', '9': '----.', '0': '-----',
-    ',': '--..--', '.': '.-.-.-', '?': '..--..', '/': '-..-.', '-': '-....-',
-    '(': '-.--.', ')': '-.--.-'
+    'Y': '-.--', 'Z': '--..', '1': '.----', '2': '..---', '3': '...--',
+    '4': '....-', '5': '.....', '6': '-....', '7': '--...', '8': '---..',
+    '9': '----.', '0': '-----', ',': '--..--', '.': '.-.-.-', '?': '..--..',
+    '/': '-..-.', '-': '-....-', '(': '-.--.', ')': '-.--.-'
 };
 
-// Variables de la interfaz y sonido
 let osc;
-let input;
-let button;
-let tiempoBase = 100;
-
-// Variables de control de la reproducción
+let tiempoBase = 120;
 let morseEnProgreso = [];
+let visualMorseArray = [];
 let indiceActual = 0;
 let timerID;
-let morseString = ""; // Cadena completa de Morse para la visualización
-
-// Variable para la imagen del logo
 let logoImg;
+let oscStarted = false;
+
+// HTML references
+let inputElement;
+let buttonElement;
+let canvasContainer;
 
 function preload() {
-    // Carga la imagen del logo (ajusta la ruta y el nombre si es necesario)
-    logoImg = loadImage('asset/vattlogo.png.png');
+    logoImg = loadImage('https://storage.googleapis.com/gemini-prod-us-west1-409903-assets/995116743901/Logopit_1753454734703.jpg',
+        () => console.log("Logo cargado desde URL"),
+        () => console.error("No se pudo cargar el logo desde la URL.")
+    );
 }
 
 function setup() {
-    createCanvas(600, 300);
-    background(220);
+    canvasContainer = select('#canvas-holder');
+    const canvas = createCanvas(canvasContainer.width, canvasContainer.width / 2);
+    canvas.parent('canvas-holder');
 
     osc = new p5.Oscillator('sine');
     osc.freq(440);
     osc.amp(0);
-    osc.start();
 
-    // Interfaz de usuario
-    input = createInput('Hola Mundo');
-    input.position(20, 20);
-    input.size(400);
-
-    button = createButton('Traducir y Reproducir');
-    button.position(input.x, input.y + input.height + 10);
-    button.mousePressed(traducir);
+    // Referencias HTML y eventos
+    inputElement = select('#text-input');
+    buttonElement = select('#translate-button');
+    buttonElement.mousePressed(iniciarTraduccion);
 }
 
-
 function draw() {
-    background(220);
+    background(240);
 
-    // Dibuja el logo ajustado exactamente al canvas, manteniendo proporción y centrado
-    if (logoImg) {
+    if (logoImg && logoImg.width > 0) {
         push();
         imageMode(CENTER);
-
-        // Calcula la escala máxima que cabe en el canvas sin deformar la imagen
-        let escala = Math.min(width / logoImg.width, height / logoImg.height);
-
-        let logoW = logoImg.width * escala;
-        let logoH = logoImg.height * escala;
-
-        // Baja la saturación y la transparencia (tint: grisáceo y más transparente)
-        tint(180, 180, 180, 90); // gris claro y muy transparente
-
-        image(logoImg, width / 2, height / 2, logoW, logoH);
+        let escala = Math.min(width / logoImg.width, height / logoImg.height) * 0.8;
+        tint(200, 150);
+        image(logoImg, width / 2, height / 2, logoImg.width * escala, logoImg.height * escala);
         pop();
     }
 
-    // --- El resto de tu código draw, igual ---
-    textSize(20);
-    textAlign(LEFT);
     fill(0);
+    noStroke();
+    textSize(width * 0.035);
+    textAlign(LEFT, TOP);
+    text('Código Morse:', 20, 20);
 
-    text('Texto original: ' + input.value(), 20, 100);
-    text('Código Morse:', 20, 150);
-
-    let morseVisual = "";
-    for (let i = 0; i < morseString.length; i++) {
-        if (i === indiceActual) {
-            fill(255, 0, 0); // Rojo para el símbolo actual
+    // Visualización del código Morse
+    let x = 20;
+    let y = 50;
+    textSize(width * 0.05);
+    for (let i = 0; i < visualMorseArray.length; i++) {
+        const item = visualMorseArray[i];
+        if (item.activo) {
+            fill(220, 50, 50);
         } else {
-            fill(0); // Negro para el resto
+            fill(0);
         }
-        morseVisual += morseString[i];
+        text(item.char, x, y);
+        x += textWidth(item.char) + 2;
+        if (x > width - 40 && item.char === ' ') {
+            x = 20;
+            y += width * 0.06;
+        }
     }
-    text(morseVisual, 20, 180);
 }
-// Función principal de traducción
-function traducir() {
-    if (timerID) {
-        clearTimeout(timerID);
+
+function touchStarted() {
+    if (getAudioContext().state !== 'running') {
+        getAudioContext().resume();
+        if (!oscStarted) {
+            osc.start();
+            oscStarted = true;
+        }
+        console.log("Audio context iniciado!");
     }
+}
+
+function iniciarTraduccion() {
+    touchStarted();
+
+    if (timerID) clearTimeout(timerID);
     osc.amp(0, 0.05);
 
-    // Limpia el texto para manejar acentos y caracteres desconocidos
-    let textoLimpio = limpiarTexto(input.value());
-    let textoMayusculas = textoLimpio.toUpperCase();
+    let textoLimpio = limpiarTexto(inputElement.value()).toUpperCase();
 
     morseEnProgreso = [];
-    morseString = "";
+    visualMorseArray = [];
 
-    for (let i = 0; i < textoMayusculas.length; i++) {
-        let char = textoMayusculas[i];
-
+    for (const char of textoLimpio) {
         if (char === ' ') {
             morseEnProgreso.push({ tipo: 'pausa', duracion: tiempoBase * 7 });
-            morseString += ' '; // Agrega un espacio para la visualización
+            visualMorseArray.push({ char: ' ', activo: false });
         } else if (MORSE_CODE_DICT[char]) {
-            let morse = MORSE_CODE_DICT[char];
-            morseString += morse;
-            for (let j = 0; j < morse.length; j++) {
-                let simbolo = morse[j];
-                let duracion = simbolo === '.' ? tiempoBase : tiempoBase * 3;
-                morseEnProgreso.push({ tipo: 'sonido', duracion: duracion });
-                if (j < morse.length - 1) {
-                    morseEnProgreso.push({ tipo: 'pausa', duracion: tiempoBase });
-                    morseString += ' '; // Pausa visual entre símbolos
-                }
+            const morse = MORSE_CODE_DICT[char];
+            for (let i = 0; i < morse.length; i++) {
+                morseEnProgreso.push({ tipo: 'sonido', duracion: morse[i] === '.' ? tiempoBase : tiempoBase * 3 });
+                visualMorseArray.push({ char: morse[i], activo: false });
+                if (i < morse.length - 1) morseEnProgreso.push({ tipo: 'pausa', duracion: tiempoBase });
             }
-
-            if (i < textoMayusculas.length - 1 && textoMayusculas[i + 1] !== ' ') {
-                morseEnProgreso.push({ tipo: 'pausa', duracion: tiempoBase * 3 });
-                morseString += '   '; // Pausa visual entre letras
-            }
+            morseEnProgreso.push({ tipo: 'pausa', duracion: tiempoBase * 3 });
+            visualMorseArray.push({ char: ' ', activo: false });
         }
     }
 
@@ -135,50 +126,45 @@ function traducir() {
     reproducirSiguienteSimbolo();
 }
 
-// Función recursiva que reproduce cada símbolo
 function reproducirSiguienteSimbolo() {
     if (indiceActual >= morseEnProgreso.length) {
         osc.amp(0, 0.1);
-        indiceActual = morseString.length; // Coloca el índice al final
+        visualMorseArray.forEach(item => item.activo = false);
+        timerID = setTimeout(() => {
+            // Opcional: vuelve a activar la traducción después de un tiempo
+        }, 2000);
         return;
     }
 
-    let simbolo = morseEnProgreso[indiceActual];
+    const simbolo = morseEnProgreso[indiceActual];
 
-    if (simbolo.tipo === 'sonido') {
-        osc.amp(0.8, 0.05);
-    } else {
-        osc.amp(0, 0.05);
+    // Resalta el símbolo actual
+    let morseCount = 0;
+    for (let i = 0; i < visualMorseArray.length; i++) {
+        if (morseCount === indiceActual && visualMorseArray[i].char !== ' ') {
+            visualMorseArray[i].activo = true;
+        } else {
+            visualMorseArray[i].activo = false;
+        }
+        if (visualMorseArray[i].char !== ' ') {
+            morseCount++;
+        }
     }
 
-    timerID = setTimeout(reproducirSiguienteSimbolo, simbolo.duracion);
-    indiceActual++;
+    if (simbolo.tipo === 'sonido') osc.amp(0.5, 0.05);
+    else osc.amp(0, 0.05);
+
+    timerID = setTimeout(() => {
+        indiceActual++;
+        reproducirSiguienteSimbolo();
+    }, simbolo.duracion);
 }
 
-// Limpia acentos y caracteres no soportados
 function limpiarTexto(str) {
-    let normalizado = str.normalize("NFD");
-    let sinAcento = normalizado.replace(/[\u0300-\u036f]/g, "");
-    let limpio = "";
-    for (let i = 0; i < sinAcento.length; i++) {
-        let char = sinAcento[i].toUpperCase();
-        if (MORSE_CODE_DICT[char] || char === ' ') {
-            limpio += char;
-        }
-    }
-    return limpio;
+    let normalizado = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return normalizado.replace(/[^a-zA-Z0-9\s.,?/\-()]/g, "");
 }
 
-// Auxiliar para obtener el símbolo de Morse de la cadena de visualización
-function getMorseSymbol(str, index) {
-    let count = 0;
-    for (let i = 0; i < str.length; i++) {
-        if (str[i] === '.' || str[i] === '-') {
-            if (count === index) {
-                return str[i];
-            }
-            count++;
-        }
-    }
-    return '';
+function windowResized() {
+    resizeCanvas(canvasContainer.width, canvasContainer.width / 2);
 }

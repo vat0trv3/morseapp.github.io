@@ -1,42 +1,64 @@
- // Variable para la imagen de fondo
+// Variable para la imagen de fondo
 
 let img;
+
+
 
 // Variables para los elementos de la interfaz de usuario (UI)
 
 let input, translateButton, pauseButton, exportButton, stopRecordingButton, renameButton, filenameInput;
 
+
+
 // Variable para el slider de velocidad
 
 let speedSlider;
+
+
 
 // Array que contiene la secuencia de sonidos, silencios y caracteres para reproducir y visualizar
 
 let morseEnProgreso = [];
 
+
+
 // Variable para el oscilador de sonido de p5.js
 
 let osc;
+
+let oscUltrasonico; // Oscilador para la señal portadora inaudible
+
+
 
 // Variables para la grabación de audio
 
 let recorder, soundFile;
 
+
+
 // Índice para rastrear la posición actual en la secuencia morseEnProgreso
 
 let indiceActual = 0;
+
+
 
 // Banderas (flags) para controlar el estado de la aplicación
 
 let reproduciendo = false, pausado = false, grabando = false;
 
+
+
 // Variable para la unidad de tiempo del morse (basada en WPM)
 
 let tiempoBase = 60;
 
+
+
 // Palabras Por Minuto (Words Per Minute), valor inicial
 
 let WPM = 20;
+
+
 
 // Bandera para la activación del audio en móviles
 
@@ -44,23 +66,55 @@ let audioIniciado = false;
 
 
 
-// ESTÉTICA: Paleta de colores centralizada para un look coherente de tema oscuro
+// Variable para la barra de progreso de la grabación
+
+let progreso = 0;
+
+
+
+// --- VARIABLES PARA EL DECODIFICADOR DE AUDIO ---
+
+let decodeButton; // Nuevo botón para activar el decodificador
+
+let mic; // Objeto para la entrada de audio (micrófono)
+
+let decodificando = false; // Flag para saber si estamos en modo decodificación
+
+let estadoSonido = 'silencio'; // Estado actual: 'sonido' o 'silencio'
+
+let contadorFrames = 0; // Contador de frames para medir duraciones
+
+const UMBRAL_SONIDO = 0.01; // Umbral de volumen para detectar un sonido (ajustable)
+
+let tiempoBaseDecodificador = 100; // Unidad de tiempo en ms (se autocalibrará)
+
+let calibrado = false; // Flag para saber si ya calibramos el tiempo base
+
+let simbolosActuales = ''; // Almacena la secuencia actual de puntos y rayas (ej: '.-')
+
+let textoDecodificado = ''; // El texto final que se va mostrando
+
+let morseInverso = {}; // Diccionario inverso (Morse -> Texto)
+
+
+
+// ESTÉTICA: Paleta de colores centralizada
 
 const theme = {
 
-background: '#121212', // Negro casi puro para el fondo
+background: '#121212',
 
-surface: 'rgba(40, 40, 40, 0.8)', // Superficie semitransparente para la caja
+surface: 'rgba(40, 40, 40, 0.8)',
 
-primary: '#BB86FC', // Púrpura/Lavanda como color de acento principal
+primary: '#BB86FC',
 
-secondary: '#03DAC6', // Verde azulado como color secundario
+secondary: '#03DAC6',
 
-text: '#EAEAEA', // Blanco roto para texto legible
+text: '#EAEAEA',
 
-textHighlight: '#FFFFFF', // Blanco puro para texto sobre fondos de color
+textHighlight: '#FFFFFF',
 
-red: '#CF6679' // Rojo para el texto resaltado de morse
+red: '#CF6679'
 
 };
 
@@ -76,51 +130,20 @@ const diccionarioMorse = {
 
 
 
-// Se ejecuta antes de setup para cargar recursos externos
-
 function preload() {
 
 img = loadImage('asset/vattlogo.png.png');
 
 }
 
-function detenerGrabacion() {
-  if (!grabando) return;
 
-  // Detiene la grabación
-  recorder.stop();
-  grabando = false;
-
-  // Comprobar si hay datos de audio grabados antes de intentar guardar.
-  // Esto evita el error si la grabación termina sin audio.
-  if (soundFile.buffer && soundFile.buffer.getChannelData(0).length > 0) {
-    let filename = filenameInput.value();
-    if (!filename) {
-      filename = `morse-${Date.now()}`;
-    }
-    saveSound(soundFile, `${filename}.wav`);
-  } else {
-    console.warn("No se pudo guardar el archivo. El búfer de audio está vacío.");
-    // Opcional: mostrar un mensaje de error al usuario
-    alert("No se pudo grabar audio. Intente con un texto más largo.");
-  }
-
-  // Restaura la interfaz de usuario
-  stopRecordingButton.hide();
-  translateButton.show();
-  pauseButton.show();
-  exportButton.show();
-  renameButton.show();
-}
-
-// Función de configuración inicial, se ejecuta una sola vez
 
 function setup() {
 
 createCanvas(windowWidth, windowHeight);
 
 
-// Configuración del generador de sonido (oscilador)
+// Configuración del oscilador audible
 
 osc = new p5.Oscillator('sine');
 
@@ -131,32 +154,53 @@ osc.amp(0);
 osc.start();
 
 
+// Configuración del oscilador ultrasónico
+
+oscUltrasonico = new p5.Oscillator('sine');
+
+oscUltrasonico.freq(21000); // Frecuencia de 21kHz
+
+oscUltrasonico.amp(0);
+
+oscUltrasonico.start();
+
+
 // Configuración del grabador de audio
 
 soundFile = new p5.SoundFile();
 
 recorder = new p5.SoundRecorder();
 
-recorder.setInput(osc);
+// No usamos setInput() para que el grabador escuche la salida maestra (ambos osciladores)
 
 
-// Llama a la función que crea y posiciona todos los elementos de la UI
+
+// Creación del diccionario inverso (Morse -> Texto)
+
+for (const key in diccionarioMorse) {
+
+const value = diccionarioMorse[key];
+
+morseInverso[value] = key;
+
+}
+
+
+
+// Configura la entrada de audio del micrófono
+
+mic = new p5.AudioIn();
+
 
 positionElements();
 
-
-// Oculta botones que no son necesarios al inicio
 
 stopRecordingButton.hide();
 
 filenameInput.hide();
 
 
-// ESTÉTICA: Aplica la fuente principal a todo el cuerpo del documento
-
 document.body.style.fontFamily = "'Roboto', sans-serif";
-
-// ESTÉTICA: Cambia el color de fondo del HTML para que coincida con el tema
 
 document.body.style.backgroundColor = theme.background;
 
@@ -164,45 +208,42 @@ document.body.style.backgroundColor = theme.background;
 
 
 
-// Bucle de dibujo principal, se ejecuta continuamente
-
 function draw() {
+  // Pinta el fondo del lienzo
+  background(theme.background);
+  
+  // Dibuja el logo de fondo como una marca de agua sutil
+  tint(255, 30);
+  
+  // Calcula las nuevas dimensiones para que el logo sea rectangular y no se distorsione
+  const logoAspectRatio = img.width / img.height; // Calcula la proporción original del logo
+  const newWidth = width;
+  const newHeight = newWidth / logoAspectRatio; // Usa la proporción para calcular la altura
+  const yPosition = (height - newHeight) / 2; // Centra la imagen verticalmente
 
-// Pinta el fondo del lienzo
+  image(img, 0, yPosition, newWidth, newHeight);
+  noTint();
+  
+  // Dibuja la caja de visualización con efecto de "vidrio esmerilado"
+  const boxWidth = width * 0.6;
+  const boxHeight = height * 0.3;
+  const boxX = (width - boxWidth) / 2;
+  const boxY = height / 2 + 40;
+  fill(theme.surface);
+  stroke(255, 255, 255, 50);
+  strokeWeight(1);
+  rect(boxX, boxY, boxWidth, boxHeight, 12);
 
-background(theme.background);
+  
 
 
-// Dibuja el logo de fondo como una marca de agua sutil
-
-tint(255, 30);
-
-image(img, 0, 0, width, height);
-
-noTint();
-
-
-
-// Dibuja la caja de visualización con efecto de "vidrio esmerilado"
-
-const boxWidth = width * 0.6;
-
-const boxHeight = height * 0.3;
-
-const boxX = (width - boxWidth) / 2;
-
-const boxY = height / 2 + 40;
 
 fill(theme.surface);
 
 stroke(255, 255, 255, 50);
 
-strokeWeight(1);
-
 rect(boxX, boxY, boxWidth, boxHeight, 12);
 
-
-// Lógica para dibujar el texto Morse dentro de la caja
 
 noStroke();
 
@@ -212,7 +253,27 @@ textSize(24);
 
 let x = boxX + 20;
 
-let y = boxY + 20;
+let y = boxY + 40;
+
+
+
+if (decodificando) {
+
+fill(theme.primary);
+
+textAlign(CENTER);
+
+text('Escuchando... Texto Decodificado:', boxX + boxWidth / 2, boxY + 30);
+
+fill(theme.text);
+
+textAlign(LEFT);
+
+text(textoDecodificado + simbolosActuales, x, y + 20);
+
+} else {
+
+textAlign(LEFT, TOP);
 
 for (let i = 0; i < morseEnProgreso.length; i++) {
 
@@ -238,9 +299,9 @@ y += 40;
 
 }
 
+}
 
 
-// Muestra el valor de Palabras Por Minuto (WPM) junto al slider
 
 let sliderX = speedSlider.x + speedSlider.width + 15;
 
@@ -254,11 +315,58 @@ textAlign(LEFT, TOP);
 
 text(`${WPM} WPM`, sliderX, sliderY);
 
+
+if (grabando) {
+
+drawProgressBar();
+
 }
 
 
 
-// Función para crear y posicionar todos los elementos de la UI
+if (decodificando) {
+
+analizarAudioEntrante();
+
+}
+
+}
+
+
+
+function drawProgressBar() {
+
+let barWidth = width * 0.6;
+
+let barHeight = 20;
+
+let barX = (width - barWidth) / 2;
+
+let barY = height / 2 - 100;
+
+fill(theme.surface);
+
+noStroke();
+
+rect(barX, barY, barWidth, barHeight, 10);
+
+let progresoAncho = map(progreso, 0, 100, 0, barWidth);
+
+fill(theme.primary);
+
+rect(barX, barY, progresoAncho, barHeight, 10);
+
+fill(theme.textHighlight);
+
+textAlign(CENTER, CENTER);
+
+textSize(14);
+
+text(`${floor(progreso)}%`, barX + barWidth / 2, barY + barHeight / 2);
+
+}
+
+
 
 function positionElements() {
 
@@ -328,7 +436,7 @@ translateButton.mousePressed(traducir);
 
 translateButton.position(posX, yBotones);
 
-translateButton.size(anchoElementos / 4, 40);
+translateButton.size(anchoElementos / 5, 40);
 
 buttonStyles(translateButton, theme.primary);
 
@@ -352,6 +460,22 @@ buttonStyles(pauseButton, theme.secondary);
 
 
 
+if (!decodeButton) {
+
+decodeButton = createButton('Decodificar');
+
+decodeButton.mousePressed(alternarDecodificador);
+
+}
+
+decodeButton.position(pauseButton.x + pauseButton.width + 10, yBotones);
+
+decodeButton.size(anchoElementos / 4, 40);
+
+buttonStyles(decodeButton, '#FF9800');
+
+
+
 if (!exportButton) {
 
 exportButton = createButton('Exportar');
@@ -362,7 +486,7 @@ exportButton.attribute('disabled', '');
 
 }
 
-exportButton.position(pauseButton.x + pauseButton.width + 10, yBotones);
+exportButton.position(decodeButton.x + decodeButton.width + 10, yBotones);
 
 exportButton.size(anchoElementos / 4, 40);
 
@@ -372,9 +496,9 @@ buttonStyles(exportButton, theme.secondary);
 
 if (!stopRecordingButton) {
 
-stopRecordingButton = createButton('Detener Grabación');
+stopRecordingButton = createButton('Cancelar Grabación');
 
-stopRecordingButton.mousePressed(detenerGrabacion);
+stopRecordingButton.mousePressed(cancelarGrabacion);
 
 }
 
@@ -415,6 +539,7 @@ renameButton.size(40, 40);
 buttonStyles(renameButton, '#444');
 
 
+
 if (!filenameInput) {
 
 filenameInput = createInput(`morse-${Date.now()}`);
@@ -436,6 +561,7 @@ filenameInput.style('padding', '5px 10px');
 filenameInput.hide();
 
 
+
 if (!speedSlider) {
 
 speedSlider = createSlider(5, 40, 20, 1);
@@ -454,46 +580,461 @@ speedSlider.style('cursor', 'pointer');
 
 
 
-// ------ LÓGICA FUNCIONAL PRINCIPAL (SIN CAMBIOS) ------
-
-
-
 function windowResized() { resizeCanvas(windowWidth, windowHeight); positionElements(); }
 
 
 
-function traducir() { if (reproduciendo) { detenerReproduccion(); return; } const texto = limpiarTexto(input.value().toLowerCase()); if (texto === '') return; traducirTexto(texto); indiceActual = 0; reproduciendo = true; pausado = false; translateButton.html('Detener'); pauseButton.removeAttribute('disabled'); exportButton.removeAttribute('disabled'); renameButton.removeAttribute('disabled'); reproducirSiguienteSimbolo(); }
+// --- FUNCIONES DEL DECODIFICADOR ---
 
 
 
-function pausarReanudar() { if (!reproduciendo) return; pausado = !pausado; if (pausado) { osc.amp(0, 0.1); pauseButton.html('Reanudar'); } else { pauseButton.html('Pausa'); reproducirSiguienteSimbolo(); } }
+function alternarDecodificador() {
+
+if (!audioIniciado) { userStartAudio(); audioIniciado = true; }
+
+decodificando = !decodificando;
 
 
 
-function exportarAudio() { if (grabando) return; if (input.value() === '') return; detenerReproduccion(); traducirTexto(limpiarTexto(input.value().toLowerCase())); stopRecordingButton.show(); translateButton.hide(); pauseButton.hide(); exportButton.hide(); renameButton.hide(); filenameInput.hide(); grabando = true; indiceActual = 0; recorder.record(soundFile); reproducirSiguienteSimbolo(); }
+if (decodificando) {
+
+mic.start();
+
+decodeButton.html('Detener');
+
+translateButton.attribute('disabled', '');
+
+pauseButton.attribute('disabled', '');
+
+exportButton.attribute('disabled', '');
+
+textoDecodificado = '';
+
+simbolosActuales = '';
+
+calibrado = false;
+
+} else {
+
+mic.stop();
+
+decodeButton.html('Decodificar');
+
+translateButton.removeAttribute('disabled');
+
+}
+
+}
 
 
 
-function detenerGrabacion() { if (!grabando) return; recorder.stop(); grabando = false; stopRecordingButton.hide(); translateButton.show(); pauseButton.show(); exportButton.show(); renameButton.show(); let filename = filenameInput.value(); if (!filename) filename = `morse-${Date.now()}`; saveSound(soundFile, `${filename}.wav`); }
+function analizarAudioEntrante() {
+
+let nivel = mic.getLevel();
+
+let nuevoEstado = (nivel > UMBRAL_SONIDO) ? 'sonido' : 'silencio';
 
 
 
-function reproducirSiguienteSimbolo() { if ((!reproduciendo && !grabando) || pausado) return; if (indiceActual >= morseEnProgreso.length) { if (grabando) { detenerGrabacion(); } if (reproduciendo) { detenerReproduccion(); } return; } const actual = morseEnProgreso[indiceActual]; if (actual.tipo === 'sonido') { osc.amp(0.5, 0.05); } else { osc.amp(0, 0.05); } setTimeout(() => { indiceActual++; reproducirSiguienteSimbolo(); }, actual.duracion); }
+if (nuevoEstado !== estadoSonido) {
+
+let duracionMs = (contadorFrames * 1000) / frameRate();
+
+if (duracionMs > 20) { // Ignorar cambios muy rápidos/ruido
+
+procesarDuracion(estadoSonido, duracionMs);
+
+}
+
+estadoSonido = nuevoEstado;
+
+contadorFrames = 0;
+
+}
+
+contadorFrames++;
+
+}
 
 
 
-function traducirTexto(texto) { morseEnProgreso = []; for (const char of texto) { if (diccionarioMorse.hasOwnProperty(char)) { const codigo = diccionarioMorse[char]; if (codigo === '/') { morseEnProgreso.push({ tipo: 'silencio', duracion: tiempoBase * 7 }); morseEnProgreso.push({ tipo: 'caracter', simbolo: ' / ', duracion: tiempoBase * 7 }); } else { for(let i = 0; i < codigo.length; i++) { const simbolo = codigo[i]; if (simbolo === '.') { morseEnProgreso.push({ tipo: 'sonido', duracion: tiempoBase }); } else if (simbolo === '-') { morseEnProgreso.push({ tipo: 'sonido', duracion: tiempoBase * 3 }); } morseEnProgreso.push({ tipo: 'caracter', simbolo: simbolo, duracion: morseEnProgreso[morseEnProgreso.length - 1].duracion }); if(i < codigo.length - 1) { morseEnProgreso.push({ tipo: 'silencio', duracion: tiempoBase }); } } morseEnProgreso.push({ tipo: 'silencio', duracion: tiempoBase * 3 }); } } } }
+function procesarDuracion(tipo, duracionMs) {
+
+if (tipo === 'sonido') {
+
+if (!calibrado && duracionMs > 50) {
+
+tiempoBaseDecodificador = duracionMs;
+
+calibrado = true;
+
+}
+
+if (calibrado) {
+
+simbolosActuales += (duracionMs < tiempoBaseDecodificador * 2) ? '.' : '-';
+
+}
+
+} else if (tipo === 'silencio' && calibrado) {
+
+if (duracionMs > tiempoBaseDecodificador * 5) {
+
+let letra = morseInverso[simbolosActuales];
+
+if (letra) textoDecodificado += letra;
+
+textoDecodificado += ' ';
+
+simbolosActuales = '';
+
+} else if (duracionMs > tiempoBaseDecodificador * 2) {
+
+let letra = morseInverso[simbolosActuales];
+
+if (letra) textoDecodificado += letra;
+
+simbolosActuales = '';
+
+}
+
+}
+
+}
 
 
 
-function detenerReproduccion() { osc.amp(0, 0.1); reproduciendo = false; pausado = false; translateButton.html('Reproducir'); pauseButton.html('Pausa'); pauseButton.attribute('disabled', ''); exportButton.attribute('disabled', ''); renameButton.attribute('disabled', ''); indiceActual = 0; }
+// --- FUNCIONES ORIGINALES (GENERADOR Y EXPORTADOR) ---
+
+
+
+function traducir() {
+
+if (decodificando) return;
+
+if (reproduciendo) {
+
+detenerReproduccion();
+
+return;
+
+}
+
+const texto = limpiarTexto(input.value().toLowerCase());
+
+if (texto === '') return;
+
+traducirTexto(texto);
+
+indiceActual = 0;
+
+reproduciendo = true;
+
+pausado = false;
+
+translateButton.html('Detener');
+
+pauseButton.removeAttribute('disabled');
+
+exportButton.removeAttribute('disabled');
+
+renameButton.removeAttribute('disabled');
+
+reproducirSiguienteSimbolo();
+
+}
+
+
+
+function pausarReanudar() {
+
+if (!reproduciendo) return;
+
+pausado = !pausado;
+
+if (pausado) {
+
+osc.amp(0, 0.1);
+
+pauseButton.html('Reanudar');
+
+} else {
+
+pauseButton.html('Pausa');
+
+reproducirSiguienteSimbolo();
+
+}
+
+}
+
+
+
+function exportarAudio() {
+
+if (input.value() === '' || decodificando) return;
+
+detenerReproduccion();
+
+traducirTexto(limpiarTexto(input.value().toLowerCase()));
+
+
+translateButton.hide();
+
+pauseButton.hide();
+
+exportButton.hide();
+
+renameButton.hide();
+
+decodeButton.hide();
+
+stopRecordingButton.show();
+
+filenameInput.hide();
+
+
+
+grabando = true;
+
+indiceActual = 0;
+
+progreso = 0;
+
+
+soundFile = new p5.SoundFile();
+
+recorder = new p5.SoundRecorder();
+
+recorder.record(soundFile);
+
+
+
+oscUltrasonico.amp(0.5, 0.05);
+
+reproducirSiguienteSimbolo();
+
+}
+
+
+
+function detenerGrabacion() {
+
+if (!grabando) return;
+
+recorder.stop();
+
+grabando = false;
+
+oscUltrasonico.amp(0, 0.1);
+
+
+
+setTimeout(() => {
+
+if (soundFile.buffer && soundFile.buffer.getChannelData(0).length > 0) {
+
+let filename = filenameInput.value();
+
+if (!filename) filename = `morse-${Date.now()}`;
+
+saveSound(soundFile, `${filename}.wav`);
+
+} else {
+
+console.warn("No se pudo guardar el archivo. El búfer de audio está vacío.");
+
+alert("No se pudo grabar audio. Intente con un texto más largo o revise los permisos del micrófono.");
+
+}
+
+}, 500);
+
+
+
+stopRecordingButton.hide();
+
+translateButton.show();
+
+pauseButton.show();
+
+exportButton.show();
+
+renameButton.show();
+
+decodeButton.show();
+
+progreso = 0;
+
+}
+
+
+
+function cancelarGrabacion() {
+
+if (!grabando) return;
+
+recorder.stop();
+
+grabando = false;
+
+osc.amp(0, 0.1);
+
+oscUltrasonico.amp(0, 0.1);
+
+detenerReproduccion();
+
+
+stopRecordingButton.hide();
+
+translateButton.show();
+
+pauseButton.show();
+
+exportButton.show();
+
+renameButton.show();
+
+decodeButton.show();
+
+progreso = 0;
+
+
+soundFile = new p5.SoundFile();
+
+recorder = new p5.SoundRecorder();
+
+}
+
+
+
+function reproducirSiguienteSimbolo() {
+
+if ((!reproduciendo && !grabando) || pausado) {
+
+return;
+
+}
+
+
+if (grabando) {
+
+const totalDuracion = morseEnProgreso.reduce((acc, item) => acc + item.duracion, 0);
+
+const duracionActual = morseEnProgreso.slice(0, indiceActual).reduce((acc, item) => acc + item.duracion, 0);
+
+progreso = map(duracionActual, 0, totalDuracion, 0, 100);
+
+}
+
+
+if (indiceActual >= morseEnProgreso.length) {
+
+if (grabando) detenerGrabacion();
+
+if (reproduciendo) detenerReproduccion();
+
+return;
+
+}
+
+
+const actual = morseEnProgreso[indiceActual];
+
+if (actual.tipo === 'sonido') {
+
+osc.amp(0.5, 0.05);
+
+} else {
+
+osc.amp(0, 0.05);
+
+}
+
+
+setTimeout(() => {
+
+indiceActual++;
+
+reproducirSiguienteSimbolo();
+
+}, actual.duracion);
+
+}
+
+
+
+function traducirTexto(texto) {
+
+morseEnProgreso = [];
+
+for (const char of texto) {
+
+if (diccionarioMorse.hasOwnProperty(char)) {
+
+const codigo = diccionarioMorse[char];
+
+if (codigo === '/') {
+
+morseEnProgreso.push({ tipo: 'silencio', duracion: tiempoBase * 7 });
+
+morseEnProgreso.push({ tipo: 'caracter', simbolo: ' / ', duracion: tiempoBase * 7 });
+
+} else {
+
+for (let i = 0; i < codigo.length; i++) {
+
+const simbolo = codigo[i];
+
+if (simbolo === '.') morseEnProgreso.push({ tipo: 'sonido', duracion: tiempoBase });
+
+else if (simbolo === '-') morseEnProgreso.push({ tipo: 'sonido', duracion: tiempoBase * 3 });
+
+
+morseEnProgreso.push({ tipo: 'caracter', simbolo: simbolo, duracion: morseEnProgreso[morseEnProgreso.length - 1].duracion });
+
+if (i < codigo.length - 1) morseEnProgreso.push({ tipo: 'silencio', duracion: tiempoBase });
+
+}
+
+morseEnProgreso.push({ tipo: 'silencio', duracion: tiempoBase * 3 });
+
+}
+
+}
+
+}
+
+}
+
+
+
+function detenerReproduccion() {
+
+osc.amp(0, 0.1);
+
+reproduciendo = false;
+
+pausado = false;
+
+translateButton.html('Reproducir');
+
+pauseButton.html('Pausa');
+
+pauseButton.attribute('disabled', '');
+
+exportButton.attribute('disabled', '');
+
+renameButton.attribute('disabled', '');
+
+indiceActual = 0;
+
+}
 
 
 
 function limpiarTexto(txt) { return txt.replace(/[^a-zA-Z0-9 ]/g, ''); }
 
 
-
-// SOLUCIÓN CLAVE: Activa el audio en móviles con el primer toque
 
 function mousePressed() { if (!audioIniciado) { userStartAudio(); audioIniciado = true; } }

@@ -1,5 +1,5 @@
 Generador de Archivos MIDI de Código Morse
-Este proyecto es un script de Python que convierte una cadena de texto en un archivo MIDI de audio. El audio generado sigue las reglas de tiempo del código Morse, representando cada carácter con la combinación sonora de puntos y rayas.
+Este proyecto es un script de P5JS que convierte una cadena de texto en un archivo MIDI de audio. El audio generado sigue las reglas de tiempo del código Morse, representando cada carácter con la combinación sonora de puntos y rayas.
 
 1. Objetivo del Proyecto 🎯
 El objetivo principal es proporcionar una herramienta simple y eficaz para traducir texto a una representación musical del código Morse. Esto puede ser útil para fines educativos, creativos o de comunicación. Al generar un archivo MIDI, la salida puede ser reproducida por cualquier software o hardware de música compatible, permitiendo la integración en proyectos más grandes o la simple escucha del mensaje codificado.

@@ -1,57 +1,50 @@
-Generador de Archivos MIDI de Código Morse
-Este proyecto es un script de P5JS que convierte una cadena de texto en un archivo MIDI de audio. El audio generado sigue las reglas de tiempo del código Morse, representando cada carácter con la combinación sonora de puntos y rayas.
+Morse Translator Interactivo con Audio y MIDI
 
-1. Objetivo del Proyecto 🎯
-El objetivo principal es proporcionar una herramienta simple y eficaz para traducir texto a una representación musical del código Morse. Esto puede ser útil para fines educativos, creativos o de comunicación. Al generar un archivo MIDI, la salida puede ser reproducida por cualquier software o hardware de música compatible, permitiendo la integración en proyectos más grandes o la simple escucha del mensaje codificado.
+Descripción del Proyecto
 
-2. Funcionalidad 🎶
-La funcionalidad del script se centra en los siguientes pasos:
+        Este proyecto es un traductor de texto a código Morse en tiempo real, desarrollado en p5.js, 
+        con una interfaz gráfica moderna y visualización dinámica. Incluye funcionalidades avanzadas de 
+        audio y grabación, permitiendo tanto la reproducción audible del Morse como su exportación en formato WAV o MIDI.
 
-Configuración del MIDI: Se inicializa un archivo MIDI (.mid) con una resolución de 480 ticks por pulso. Esta configuración establece la base para la sincronización y el tempo.
+El proyecto combina varias características únicas:
+	•	Traducción de texto a Morse: Convierte letras y 
+        números en puntos y rayas según el estándar internacional.
+	•	Reproducción de audio en tiempo real:
+	•	Genera sonido audible mediante un oscilador p5.js.
+	•	Posibilidad de emitir una señal ultrasónica inaudible para comunicación encubierta.
+	•	Grabación de audio: Permite registrar la secuencia Morse en WAV.
+	•	Exportación MIDI: Convierte la secuencia Morse en un archivo MIDI, donde los puntos y rayas se transforman en 
+        notas musicales.
+	•	Decodificación de Morse desde micrófono: Analiza el audio entrante y reconstruye el dibujo. Características Destacadas
+	•	Interfaz gráfica moderna y responsiva:
+	•	Caja central con efecto de vidrio esmerilado para mostrar la secuencia Morse.
+	•	Logo de fondo como marca de agua.
+	•	Paleta de colores centralizada y coherente para facilidad visual.
+	•	Controles interactivos:
+	•	Input de texto para traducir.
+	•	Botones de Reproducir, Pausa, Decodificar, Exportar y Exportar MIDI.
+	•	Slider de velocidad (WPM) ajustable en tiempo real.
+	•	Opción para renombrar archivos exportados.
+	•	Grabación y progreso:
+	•	Barra de progreso para la grabación de audio.
+	•	Cancelación de grabación en cualquier momento.
 
-Definición de Unidades de Tiempo: Se establece una unidad de tiempo base, el "punto" (.), y a partir de ahí se calculan las duraciones para:
+Cómo Usarlo
+	1.	Abrir el proyecto: Cargar el archivo HTML en un navegador compatible con Web Audio API.
+	2.	Escribir texto: Introducir el mensaje que deseas traducir en Morse.
+	3.	Reproducir Morse:
+	•	Presionar Reproducir para escuchar la secuencia.
+	•	Usar Pausa para detener temporalmente la reproducción.
+	4.	Exportar audio:
+	•	Pulsar Exportar para grabar la señal Morse en WAV.
+	•	Renombrar el archivo si se desea.
+	5.	Exportar MIDI:
+	•	Presionar Exportar MIDI para generar un archivo MIDI con la secuencia Morse.
+	6.	Decodificar desde audio:
+	•	Activar Decodificar para que el micrófono lea Morse entrante y reconstruya el texto en tiempo real.
 
-Punto: 1 unidad de tiempo.
-
-Raya: 3 unidades de tiempo.
-
-Pausa entre símbolos: 1 unidad de tiempo.
-
-Pausa entre letras: 3 unidades de tiempo.
-
-Pausa entre palabras: 7 unidades de tiempo.
-
-Conversión de Texto: El script itera sobre cada carácter de la cadena de entrada. Para cada carácter, busca su equivalente en el diccionario de código Morse y genera los eventos MIDI correspondientes (note_on y note_off) con las duraciones correctas.
-
-Generación del Archivo: Finalmente, todos los eventos MIDI se guardan en un archivo con el nombre especificado, listo para ser reproducido.
-
-3. Requisitos de Lenguaje y Diccionario 📖
-El programa utiliza un diccionario para mapear caracteres a su código Morse. Solo los caracteres incluidos en este diccionario pueden ser convertidos.
-
-Lenguaje de Programación: Python 3.x
-
-Biblioteca Requerida: mido
-
-Diccionario de Caracteres: El programa soporta los siguientes caracteres:
-
-Letras: A-Z (el script convierte automáticamente el texto a mayúsculas).
-
-Números: 0-9
-
-Signos de Puntuación: . (punto), ,  (coma), ? (interrogación), / (barra), - (guion), ( (paréntesis de apertura), ) (paréntesis de cierre).
-
-El diccionario MORSE_CODE_DICT es el siguiente:
-
-Python
-
-MORSE_CODE_DICT = {
-    'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.',
-    'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..',
-    'M': '--', 'N': '-.', 'O': '---', 'P': '.--.', 'Q': '--.-', 'R': '.-.',
-    'S': '...', 'T': '-', 'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-',
-    'Y': '-.--', 'Z': '--..',
-    '1': '.----', '2': '..---', '3': '...--', '4': '....-', '5': '.....',
-    '6': '-....', '7': '--...', '8': '---..', '9': '----.', '0': '-----',
-    ', ': '--..--', '.': '.-.-.-', '?': '..--..', '/': '-..-.', '-': '-....-',
-    '(': '-.--.', ')': '-.--.-'
-}
+Requisitos
+	•	Navegador moderno con soporte para Web Audio API (Chrome, Firefox, Edge).
+	•	Librerías:
+	•	p5.js
+	•	p5.sound
